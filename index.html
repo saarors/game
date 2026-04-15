@@ -1,0 +1,212 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Lua Shooter</title>
+
+  <style>
+    body { margin: 0; background: #111; overflow: hidden; }
+    canvas { display: block; margin: 0 auto; background: #000; }
+  </style>
+
+  <script type="module">
+    import { LuaFactory } from "https://cdn.jsdelivr.net/npm/wasmoon@1.16.0/+esm"
+
+    window.addEventListener("DOMContentLoaded", async () => {
+
+      const canvas = document.getElementById("game")
+      const ctx = canvas.getContext("2d")
+
+      canvas.width = 900
+      canvas.height = 600
+
+      const keys = {}
+
+      window.addEventListener("keydown", e => keys[e.key] = true)
+      window.addEventListener("keyup", e => keys[e.key] = false)
+
+      let mouse = { x: 0, y: 0, down: false }
+
+      canvas.addEventListener("mousemove", e => {
+        mouse.x = e.offsetX
+        mouse.y = e.offsetY
+      })
+
+      canvas.addEventListener("mousedown", () => mouse.down = true)
+      canvas.addEventListener("mouseup", () => mouse.down = false)
+
+      const luaFactory = new LuaFactory()
+      window.lua = await luaFactory.createEngine()
+
+      // ===== bridge =====
+      window.lua.global.set("drawRect", (x,y,w,h,color) => {
+        ctx.fillStyle = color
+        ctx.fillRect(x,y,w,h)
+      })
+
+      window.lua.global.set("clear", () => {
+        ctx.clearRect(0,0,canvas.width,canvas.height)
+      })
+
+      window.lua.global.set("getKey", (k) => !!keys[k])
+      window.lua.global.set("getMouse", () => mouse)
+
+      window.lua.global.set("drawText", (t,x,y) => {
+        ctx.fillStyle = "white"
+        ctx.font = "16px Arial"
+        ctx.fillText(t,x,y)
+      })
+
+      // ===== GAME =====
+      window.lua.doString(`
+        player = {x=400,y=300, hp=100}
+        bullets = {}
+        enemies = {}
+        score = 0
+        spawnTimer = 0
+
+        function spawnEnemy()
+          table.insert(enemies, {
+            x = math.random(0,900),
+            y = math.random(0,600),
+            hp = 3
+          })
+        end
+
+        function shoot(mx,my)
+          table.insert(bullets, {
+            x = player.x,
+            y = player.y,
+            dx = (mx - player.x)/20,
+            dy = (my - player.y)/20
+          })
+        end
+
+        function dist(a,b)
+          return math.sqrt((a.x-b.x)^2 + (a.y-b.y)^2)
+        end
+
+        function update()
+          if getKey("w") then player.y = player.y - 4 end
+          if getKey("s") then player.y = player.y + 4 end
+          if getKey("a") then player.x = player.x - 4 end
+          if getKey("d") then player.x = player.x + 4 end
+
+          local m = getMouse()
+          if m.down then
+            shoot(m.x,m.y)
+          end
+
+          for i=#bullets,1,-1 do
+            local b = bullets[i]
+            b.x = b.x + b.dx
+            b.y = b.y + b.dy
+
+            if b.x < 0 or b.x > 900 or b.y < 0 or b.y > 600 then
+              table.remove(bullets,i)
+            end
+          end
+
+          for i=#enemies,1,-1 do
+            local e = enemies[i]
+
+            if e.x < player.x then e.x = e.x + 1.5 else e.x = e.x - 1.5 end
+            if e.y < player.y then e.y = e.y + 1.5 else e.y = e.y - 1.5 end
+
+            if dist(e,player) < 20 then
+              player.hp = player.hp - 1
+            end
+
+            for j=#bullets,1,-1 do
+              local b = bullets[j]
+              if dist(e,b) < 15 then
+                e.hp = e.hp - 1
+                table.remove(bullets,j)
+              end
+            end
+
+            if e.hp <= 0 then
+              table.remove(enemies,i)
+              score = score + 1
+            end
+          end
+
+          spawnTimer = spawnTimer + 1
+          if spawnTimer > 60 then
+            spawnEnemy()
+            spawnTimer = 0
+          end
+        end
+
+        function draw()
+          clear()
+
+          drawRect(player.x,player.y,20,20,"green")
+
+          for _,b in ipairs(bullets) do
+            drawRect(b.x,b.y,5,5,"yellow")
+          end
+
+          for _,e in ipairs(enemies) do
+            drawRect(e.x,e.y,20,20,"red")
+          end
+
+          drawText("HP: "..player.hp,10,20)
+          drawText("Score: "..score,10,40)
+        end
+      `)
+
+      function loop() {
+        window.lua.global.get("update")()
+        window.lua.global.get("draw")()
+        requestAnimationFrame(loop)
+      }
+
+      loop()
+    })
+  </script>
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+</body>
+</html>
