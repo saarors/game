@@ -45,6 +45,7 @@ function drawUI()
 
   drawButton("GOD MODE", menu.x+10, menu.y+40, 160, 30, cheats.god)
   drawButton("AUTO SHOOT", menu.x+10, menu.y+80, 160, 30, cheats.autoShoot)
+  drawButton("KILL ALL", menu.x+10, menu.y+120, 160, 30, false)
 end
 
 old_draw = draw
@@ -77,7 +78,10 @@ function update()
       cheats.autoShoot = not cheats.autoShoot
     end
 
-
+    -- KILL ALL
+    if isInside(menu.x+10, menu.y+120, 160, 30, m) then
+      enemies = {}
+    end
   end
 end
 `)
