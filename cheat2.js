@@ -78,10 +78,7 @@ function update()
       cheats.autoShoot = not cheats.autoShoot
     end
 
-    -- KILL ALL
-    if isInside(menu.x+10, menu.y+120, 160, 30, m) then
-      enemies = {}
-    end
+
   end
 end
 `)
